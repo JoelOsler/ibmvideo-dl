@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hey.Email Dumpster Fire Clip/IBM Video Downloader</title>
+  </head>
+  <body>
+    <div id="container">
+      <h2>
+        Type/paste in Dumpster Fire Clip URL: Ex.
+        https://hey.science/dumpster-fire/clip/?id=128699043</br>BTW, that's not my
+        burn, still waiting for mine :)
+      </h2>
+      <form name="idForm" method="post">
+        URL: <input type="url" name="clipurl" />
+        <input type="submit" value="Submit" />
+      </form>
+      <h4 id="waitplz" hidden="true">This might take at least 5 seconds...</h4>
+    </div>
+    <footer>
+      Made with &#10084;&#65039; by OmegaDev, With Inspiration By
+      BurritoSoftware
+    </footer>
+    <script type="text/javascript">
+      // your form
+      var form = document.getElementsByName("idForm")[0];
+
+      // attach event listener
+      form.addEventListener("submit", validateForm, true);
+
+      function validateForm(event) {
+        event.preventDefault();
+        document.getElementById("waitplz").hidden = false;
+        var url = document.forms["idForm"]["clipurl"].value;
+        if (url == "") {
+          alert("URL must be filled out!");
+          return false;
+        }
+        id = new URL(url).searchParams.get("id");
+        beginProcedure(id);
+      }
+
+      function beginProcedure(mediaid) {
+        var data = [];
+        var resultIndex;
+        let socket = new WebSocket(
+          "wss://r88888888-1-" +
+            mediaid +
+            "-recorded-wss-omega.ums.services.video.ibm.com/1/ustream"
+        );
+
+        socket.onopen = function (e) {
+          socket.send(
+            JSON.stringify({
+              cmd: "connect",
+              args: [
+                {
+                  type: "viewer",
+                  appId: 3,
+                  appVersion: 2,
+                  rsid: "12d0eca41:90571dfd",
+                  rpin: "_rpin.657087760109300379",
+                  referrer: "unknown",
+                  media: `${mediaid}`,
+                  application: "recorded",
+                  buildNumber: "2.26.10",
+                  clusterHost:
+                    "r%rnd%-1-%mediaId%-%mediaType%-%protocolPrefix%-%cluster%.ums.services.video.ibm.com",
+                },
+              ],
+            })
+          );
+          var timer = setInterval(function () {
+            if (isDone()) {
+              console.log("DOING IT!");
+              getStreamData(data, resultIndex);
+              clearInterval(timer);
+            } else {
+              console.log("WAITING...");
+            }
+          }, 2500);
+        };
+
+        socket.onmessage = function (event) {
+          data.push(JSON.parse(event.data));
+        };
+
+        socket.onclose = function (event) {
+          if (event.wasClean) {
+            alert(
+              `[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`
+            );
+          } else {
+            // e.g. server process killed or network down
+            // event.code is usually 1006 in this case
+            alert("[close] Connection died");
+          }
+        };
+
+        socket.onerror = function (error) {
+          alert(`[error] ${error.message}`);
+        };
+
+        function isDone() {
+          data.forEach((element, index) => {
+            if (element.args[0].hasOwnProperty("stream")) {
+              if (
+                element.args[0].stream.hasOwnProperty("version") &&
+                Object.keys(element.args[0].stream.streamFormats).length !== 0
+              ) {
+                resultIndex = index;
+              }
+            }
+          });
+          return true;
+        }
+
+        function getStreamData(socketData, index) {
+          console.log(
+            socketData[index].args[0].stream.streamFormats["flv/segmented"]
+          );
+          createDownloadURL(
+            socketData[index].args[0].stream.streamFormats["flv/segmented"]
+          );
+        }
+
+        function createDownloadURL(stream) {
+          host = "https://uhsakamai-a.akamaihd.net/";
+          path = stream.contentAccess["accessList"][0].data.path;
+          hash = stream.hashes[0];
+          chunktime = Math.ceil(stream.videoLength / stream.chunkTime);
+          chunks = [];
+          for (var i = 0; i < chunktime; i++) {
+            chunks.push(host + path + "2/1/chunk_" + i + "_" + hash + ".flv");
+          }
+          window.chunks = chunks;
+          downloadVideo(chunks);
+        }
+
+        function downloadVideo(chunks) {
+          dataSet = [];
+
+          const fetchPromise = chunks.map((value, index) =>
+            fetch(value).then((response) => {
+              response.arrayBuffer().then((buffer) => {
+                dataSet[index] = buffer;
+                return dataSet;
+              });
+            })
+          );
+          Promise.all(fetchPromise).then((result) => {
+            setTimeout(function () {
+              var blob = new Blob(dataSet, {
+                  type: "application/octet-stream",
+                }),
+                e = document.createEvent("MouseEvents"),
+                a = document.createElement("a");
+
+              a.download = "clip.flv";
+              a.href = window.URL.createObjectURL(blob);
+              a.dataset.downloadurl = [
+                "application/octet-stream",
+                a.download,
+                a.href,
+              ].join(":");
+              e.initMouseEvent(
+                "click",
+                true,
+                false,
+                window,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                false,
+                false,
+                0,
+                null
+              );
+              a.dispatchEvent(e);
+            }, 800);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
